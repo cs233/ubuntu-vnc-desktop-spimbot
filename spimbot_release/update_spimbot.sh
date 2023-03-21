@@ -11,6 +11,11 @@ if [ $Arch = "x86_64" ]; then
     BINARY_VERSION="linux_x86_64"
 fi;
 
+if [[ $PATH == ?(*:)$DEST_PATH?(:*) ]]; then
+else
+    export PATH=$DEST_PATH:$PATH
+fi
+
 cd /home/ubuntu
 if [ ! -e "/home/ubuntu/.spimbot/spimbot-binaries" ]; then
     mkdir ./.spimbot/
@@ -31,3 +36,4 @@ fi;
 
 cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot $DEST_PATH
 echo "Installed new binary"
+cd ~/shared
