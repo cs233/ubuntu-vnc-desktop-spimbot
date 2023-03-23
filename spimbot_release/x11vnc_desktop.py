@@ -193,9 +193,12 @@ def get_screen_resolution():
     """Obtain the local screen resolution."""
 
     import subprocess
-    output = subprocess.check_output("system_profiler SPDisplaysDataType | grep Resolution", shell=True)
-    mode = output.decode().strip().split(" ")
-    return mode[1]+"x"+mode[3]
+    try:
+        output = subprocess.check_output("system_profiler SPDisplaysDataType | grep Resolution", shell=True)
+        mode = output.decode().strip().split(" ")
+        return mode[1]+"x"+mode[3]
+    except BaseException:
+        return ""
 
 def handle_interrupt(container):
     """Handle keyboard interrupt"""
@@ -347,7 +350,7 @@ if __name__ == "__main__":
         size = get_screen_resolution()
         if not size:
             # Set default size
-            size = "1920x1080"
+            size = "1360x768"
     else:
         size = args.size
 
