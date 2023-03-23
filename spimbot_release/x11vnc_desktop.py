@@ -192,20 +192,10 @@ def wait_net_service(port, timeout=30):
 def get_screen_resolution():
     """Obtain the local screen resolution."""
 
-    try:
-        if sys.version_info.major > 2:
-            import tkinter as tk
-        else:
-            import Tkinter as tk
-
-        root = tk.Tk()
-        root.withdraw()
-        width, height = root.winfo_screenwidth(), root.winfo_screenheight()
-
-        return str(width) + 'x' + str(height)
-    except BaseException:
-        return ""
-
+    import subprocess
+    output = subprocess.check_output("system_profiler SPDisplaysDataType | grep Resolution", shell=True)
+    mode = output.decode().strip().split(" ")
+    return mode[1]+"x"+mode[3]
 
 def handle_interrupt(container):
     """Handle keyboard interrupt"""
