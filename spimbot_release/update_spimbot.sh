@@ -23,7 +23,7 @@ if [ ! -e "/home/ubuntu/.spimbot/spimbot-binaries" ]; then
     git clone https://github.com/cs233/spimbot-binaries
 fi;
 
-cd /home/ubuntu/.spimbot/spimbot-binaries 
+cd /home/ubuntu/.spimbot/spimbot-binaries
 git remote update > /dev/null
 commitdiff=$(git rev-list HEAD...origin/main --count)
 
