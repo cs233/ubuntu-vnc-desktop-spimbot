@@ -183,7 +183,7 @@ RUN sed -i 's/\/home\/ubuntu\/Desktop/\/home\/ubuntu\/shared/g' $DOCKER_HOME/.co
 RUN echo 'if [ -f "/home/ubuntu/shared/update_spimbot.sh" ]; then\n\
     . /home/ubuntu/shared/update_spimbot.sh\n\
 else\n\
-    echo "Failed to update \"update_spimbot.sh\" \(script was not located in /home/ubuntu/shared/. Are you running open_spimbot.sh within your spimbot_release folder?)\"\n\
+    echo "Failed to update \"update_spimbot.sh\" \(script was not located in /home/ubuntu/shared/. Are you running open_spimbot.sh within your spimbot_release folder?\)"\n\
 fi' >> /home/ubuntu/.bashrc;
 
 RUN echo 'if [ -f "/home/ubuntu/shared/update_spimbot.sh" ]; then\n\
