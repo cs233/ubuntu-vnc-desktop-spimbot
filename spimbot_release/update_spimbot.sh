@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 
@@ -11,7 +11,7 @@ if [ $Arch = "x86_64" ]; then
     BINARY_VERSION="linux_x86_64"
 fi;
 
-if [[ $PATH == ?(*:)$DEST_PATH?(:*) ]]; then
+if [[ $PATH == ?\(*:\)$DEST_PATH?\(:*\) ]]; then
 else
     export PATH=$DEST_PATH:$PATH
 fi
