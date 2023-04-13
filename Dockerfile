@@ -200,5 +200,5 @@ ENV DOCKER_CMD=startvnc.sh
 
 USER root
 ENTRYPOINT ["/sbin/my_init", "--", "/sbin/setuser", "ubuntu"]
-CMD ["gnome-terminal", "--", "sh"]
+CMD ["gnome-terminal", "--", "zsh"]
 CMD ["$DOCKER_CMD"]
