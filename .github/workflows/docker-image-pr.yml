@@ -13,6 +13,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Obtain repository and tag names
+        shell: bash
+        run: |
+             if [ -z "${{ secrets.DOCKER_HUB_REPO }}" ]; then
+                 echo "repo=${{ secrets.DOCKER_HUB_USERNAME }}" >> $GITHUB_OUTPUT
+             else
+                 echo "repo=${{ secrets.DOCKER_HUB_REPO }}" >> $GITHUB_OUTPUT
+             fi
+             echo "tag=$(echo ${GITHUB_REF#refs/heads/} | sed 's/^main$/latest/g')" >> $GITHUB_OUTPUT
+        id: extract_tag
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2        
       - name: Set up Docker Buildx
