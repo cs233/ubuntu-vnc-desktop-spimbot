@@ -21,7 +21,6 @@ jobs:
              else
                  echo "repo=${{ secrets.DOCKER_HUB_REPO }}" >> $GITHUB_OUTPUT
              fi
-             echo "tag=$(echo ${GITHUB_REF#refs/heads/} | sed 's/^main$/latest/g')" >> $GITHUB_OUTPUT
         id: extract_tag
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2        
@@ -34,7 +33,7 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64
           push: false
-          tags: ${{ steps.extract_tag.outputs.repo }}/ubuntu-vnc-desktop-spimbot:${{ steps.extract_tag.outputs.tag }}
+          tags: ${{ steps.extract_tag.outputs.repo }}/ubuntu-vnc-desktop-spimbot:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
