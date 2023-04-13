@@ -175,6 +175,8 @@ RUN mkdir -p $DOCKER_HOME/.config/mozilla && \
 RUN apt-get update && \
     apt-get install -y qt5-default wget xdg-user-dirs
 
+RUN mkdir -p $DOCKER_HOME/bin
+
 # change the Desktop to be the folder ~/shared instead of ~/Desktop
 RUN sed -i 's/\/home\/ubuntu\/Desktop/\/home\/ubuntu\/shared/g' $DOCKER_HOME/.config/pcmanfm/LXDE/desktop-items-0.conf
 

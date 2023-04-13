@@ -13,10 +13,6 @@ if [[ $PATH != ?(*:)$DEST_PATH?(:*) ]]; then
     export PATH=$DEST_PATH:$PATH
 fi
 
-if [ ! -e "/home/ubuntu/bin" ]; then
-    mkdir /home/ubuntu/bin
-fi;
-
 cd /home/ubuntu
 if [ ! -e "/home/ubuntu/.spimbot/spimbot-binaries" ]; then
     mkdir ./.spimbot/
