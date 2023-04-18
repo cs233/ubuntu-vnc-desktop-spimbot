@@ -180,6 +180,9 @@ RUN mkdir -p $DOCKER_HOME/bin
 # change the Desktop to be the folder ~/shared instead of ~/Desktop
 RUN sed -i 's/\/home\/ubuntu\/Desktop/\/home\/ubuntu\/shared/g' $DOCKER_HOME/.config/pcmanfm/LXDE/desktop-items-0.conf
 
+# add spimbot updating to our bashrc
+RUN echo "source ~/.update_spimbot.sh" >> $DOCKER_HOME/.bashrc
+
 ########################################################
 # Start our user
 ########################################################

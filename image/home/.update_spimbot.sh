@@ -1,4 +1,4 @@
-# update_spimbot.sh
+# Update the spimbot binary if it's not present or if there's a new version
 
 Arch=$(uname -m)
 
@@ -10,7 +10,8 @@ if [ $Arch = "x86_64" ]; then
 fi;
 
 if [[ $PATH != ?(*:)$DEST_PATH?(:*) ]]; then
-    export PATH=$DEST_PATH:$PATH
+    export PATH=$DEST_PATH:$PATH            # Add the students' working directory
+    export PATH="/home/ubuntu/bin":$PATH    # Add the local bin for our binaries
 fi
 
 cd /home/ubuntu
@@ -32,7 +33,6 @@ fi;
 
 cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot $DEST_PATH
 cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot /home/ubuntu/bin
+
 echo "QtSpimbot updated"
 cd /home/ubuntu/shared
-
-export PATH=$PATH:"/home/ubuntu/bin"
