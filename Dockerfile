@@ -136,7 +136,7 @@ RUN apt-get update && \
 ENV DOCKER_USER=ubuntu \
     DOCKER_UID=9999 \
     DOCKER_GID=9999 \
-    DOCKER_SHELL=/bin/zsh
+    DOCKER_SHELL=/bin/bash
 
 ENV DOCKER_GROUP=$DOCKER_USER \
     DOCKER_HOME=/home/$DOCKER_USER \
@@ -177,6 +177,9 @@ RUN apt-get update && \
 
 # change the Desktop to be the folder ~/shared instead of ~/Desktop
 RUN sed -i 's/\/home\/ubuntu\/Desktop/\/home\/ubuntu\/shared/g' $DOCKER_HOME/.config/pcmanfm/LXDE/desktop-items-0.conf
+
+# add spimbot updating to our bashrc
+RUN echo "source ~/.update_spimbot.sh" >> $DOCKER_HOME/.bashrc
 
 ########################################################
 # Start our user
