@@ -2,17 +2,14 @@
 
 Arch=$(uname -m)
 
-DEST_PATH=/home/ubuntu/shared
+WORKING_FOLDER=/home/ubuntu/shared
 BINARY_VERSION="linux_arm64"
 
 if [ $Arch = "x86_64" ]; then
     BINARY_VERSION="linux_x86_64"
 fi;
 
-if [[ $PATH != ?(*:)$DEST_PATH?(:*) ]]; then
-    export PATH=$DEST_PATH:$PATH            # Add the students' working directory
-    export PATH="/home/ubuntu/bin":$PATH    # Add the local bin for our binaries
-fi
+export PATH=$WORKING_FOLDER:$PATH      # Add the students' working directory
 
 cd /home/ubuntu
 if [ ! -e "/home/ubuntu/.spimbot/spimbot-binaries" ]; then
@@ -25,14 +22,13 @@ cd /home/ubuntu/.spimbot/spimbot-binaries
 git remote update > /dev/null
 commitdiff=$(git rev-list HEAD...origin/main --count)
 
-if [ ! -e "/home/ubuntu/shared/QtSpimbot" ] || [ $commitdiff -gt 0 ]; then
+if [ ! -e $WORKING_FOLDER/QtSpimbot ] || [ $commitdiff -gt 0 ]; then
     echo "Update required, pulling + installing..."
     git checkout main > /dev/null && git pull > /dev/null
     echo "Installed new binary"
 fi;
 
-cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot $DEST_PATH
-cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot /home/ubuntu/bin
+cp /home/ubuntu/.spimbot/spimbot-binaries/$BINARY_VERSION/QtSpimbot $WORKING_FOLDER
 
 echo "QtSpimbot updated"
-cd /home/ubuntu/shared
+cd $WORKING_FOLDER
