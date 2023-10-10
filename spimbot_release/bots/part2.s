@@ -2,6 +2,9 @@
 PRINT_STRING            = 4
 PRINT_CHAR              = 11
 PRINT_INT               = 1
+GRIDSIZE = 4
+GRID_SQUARED = 16
+ALL_VALUES = 65535
 
 # memory-mapped I/O
 VELOCITY                = 0xffff0010
@@ -42,14 +45,25 @@ GET_WATER_LEVEL         = 0xffff201c
 
 MMIO_STATUS             = 0xffff204c
 
+
 .data
 ### Puzzle
-puzzlewrapper:     .byte 0:400
+board:     .space 65535
+puzzle_received:   .byte 0
 #### Puzzle
 
 has_puzzle: .word 0
 
 has_bonked: .byte 0
+
+.align 2
+# Test case 0
+# Everything after .half is a halfword sized piece of data (a.k.a. shorts)
+# board is a 16x16 array of shorts
+# Each hex number is an element of the array
+# Each row of test0_board is a row of the array
+# Try other test cases
+
 # -- string literals --
 .text
 main:
@@ -63,19 +77,19 @@ main:
     or      $t4, $t4, REQUEST_PUZZLE_INT_MASK   # enable puzzle interrupt
     or      $t4, $t4, 1 # global enable
     mtc0    $t4, $12
-    
+
     li $t1, 0
     sw $t1, ANGLE
     li $t1, 1
     sw $t1, ANGLE_CONTROL
     li $t2, 0
     sw $t2, VELOCITY
-        
+
     # YOUR CODE GOES HERE!!!!!!
-    
+
 loop: # Once done, enter an infinite loop so that your bot can be graded by QtSpimbot once 10,000,000 cycles have elapsed
     j loop
-    
+
 
 .kdata
 chunkIH:    .space 40
@@ -197,272 +211,493 @@ done:
 
 
 # Below are the provided puzzle functionality.
+
 .text
-.globl is_attacked
-is_attacked:
-    li $t0,0 #counter i=0
-    li $t1,0 #counter j=0
+.globl board_done
+
+# BOARD_DONE
+board_done:
+    sub  $sp, $sp, 24
+    sw   $ra, 0($sp)
+    sw   $s0, 4($sp)     # i
+    sw   $s1, 8($sp)     # j
+    sw   $s2, 12($sp)    # GRID_SIZE
+    sw   $s3, 16($sp)    # arg
+    sw   $a0, 20($sp)
+
+    and  $s0, $zero, $s0
+    and  $s1, $zero, $s1
+    li   $s2, GRID_SQUARED
+    move $s3, $a0
+
+board_done_outer_loop:  # for (int i = 0 ; i < GRID_SQUARED ; ++ i)
+    bge  $s0, $s2, board_done_exit
+    li   $s1, 0
+board_done_inner_loop:  # for (int j = 0 ; j < GRID_SQUARED ; ++ j)
+    bge  $s1, $s2, board_done2_exit
+    mul  $t0, $s0, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s1   # i * GRID_SQUARED + j
+    mul  $t0, $t0, 2     # (i * GRID_SQUARED + j) * data_size
+    add  $t0, $t0, $s3   # &board[i][j]
+    lhu  $a0, 0($t0)
+    jal  has_single_bit_set
+    bne  $v0, $zero, board_done_not_if #if (!has_single_bit_set(board[i][j]))
+    move $v0, $zero     # return false;
+    j    board_done_finish
+board_done_not_if:
+    addi  $s1, $s1, 1
+    j    board_done_inner_loop
+board_done2_exit:
+    addi  $s0, $s0, 1
+    j    board_done_outer_loop
+board_done_exit:
+    li   $v0, 1 # return true;
+board_done_finish:
+    lw   $a0, 20($sp)
+    lw   $s3, 16($sp)   
+    lw   $s2, 12($sp)
+    lw   $s0, 4($sp)     
+    lw   $s1, 8($sp)     
+    lw   $ra, 0($sp)
+    add  $sp, $sp, 24
+    jr $ra
+# BOARD_DONE
+
+# PRINT BOARD
+print_board:
+    sub  $sp, $sp, 20
+    sw   $ra, 0($sp)
+    sw   $s0, 4($sp)
+    sw   $s1, 8($sp)
+    sw   $s2, 12($sp)
+    sw   $s3, 16($sp)
+
+    move $s0, $a0
+
+    li   $s1, 0          # $s1 is i
+pb_for_i:
+    bge  $s1, GRID_SQUARED, pb_done_for_i
+    li   $s2, 0          # $s2 is j
+
+pb_for_j:
+    bge  $s2, GRID_SQUARED, pb_done_for_j
+    mul  $t0, $s1, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s2   # i * 16 + j
+    mul  $t0, $t0, 2     # (i * 16 + j) * data_size
+    add  $t0, $t0, $s0   # &board[i][j]
+    lhu  $s3, 0($t0)     # value = board[i][j]
     
-    move $t2,$a1 #counter N
-    j forloopvertical
+    move $a0, $s3
+    jal  has_single_bit_set
+    li   $a0, '*'        # c = '*'
+
+    beq  $v0, $0, pb_skip_if # if (has_single_bit_set(value))
+    move $a0, $s3
+    jal  get_lowest_set_bit  # get_lowest_bit_set(value)
+    add  $t0, $v0, 1         # c
+
+    la   $t1, symbollist
+    add  $t0, $t0, $t1
+    lbu  $a0, 0($t0)
+pb_skip_if:
+    li   $v0, 11  #printf(c)
+    syscall
+
+    add  $s2, $s2, 1
+    j    pb_for_j
+pb_done_for_j:
+    li   $a0, '\n' 
+    li   $v0, 11   #printf("\n")
+    syscall
+
+    add  $s1, $s1, 1
+    j    pb_for_i
+pb_done_for_i:
+    lw   $ra, 0($sp)
+    lw   $s0, 4($sp)
+    lw   $s1, 8($sp)
+    lw   $s2, 12($sp)
+    lw   $s3, 16($sp)
+    add  $sp, $sp, 20
     
-forloopvertical:
-    bge $t0,$t2,forloophorizontal  # if i >= n move on to next for loop
-    bne $t0,$a2,verticalcheck  #checking i != row, if i != row move onto next check
-    add $t0,$t0,1  # incrementing i = i+1
-    j forloopvertical # jump back to for
+    jr   $ra
+
+# PRINT BOARD
+
+# HAS SINGLE BIT SET
+has_single_bit_set:
+    bne  $a0, $0, skip_hs_if_1
+    li   $v0, 0
+    jr   $ra
+skip_hs_if_1:
+    sub  $t0, $a0, 1
+    and  $t0, $a0, $t0
+    beq  $t0, $0, skip_hs_if2
+    li   $v0, 0
+    jr   $ra
+skip_hs_if2:
+    li   $v0, 1
+    jr   $ra
+# HAS SINGLE BIT SET
+
+# GET LOWEST SET BIT
+get_lowest_set_bit:
+    li   $t0, 0
+    li   $t1, 16
+    li   $t2, 1
+gl_for:
+    bge  $t0, $t1, done_gl_loop
+    and  $t3, $a0, $t2
+    beq  $t3, $0, skip_gl_if
+    move $v0, $t0
+    jr   $ra
+skip_gl_if:
+    sll  $t2, $t2, 1
+    add  $t0, $t0, 1
+    j    gl_for
+done_gl_loop:
+    li   $v0, 0
+    jr   $ra
+# GET LOWEST SET BIT
+
+
+# QUANT_SOLVE
+quant_solve:
+    sub  $sp, $sp, 28
+    sw   $ra, 0($sp)
+    sw   $a0, 4($sp)
+    sw   $a1, 8($sp)
+    sw   $s0, 12($sp) # changed
+    sw   $s1, 16($sp) # iter
+    sw   $s2, 20($sp) # solution
+    sw   $s3, 24($sp)
+
+    li $s0, 0
+    li $s1, 0
+    li $s2, 1
+
+quant_solve_first_do_while:
+    jal  rule1
+    move $s0, $v0
+    addi $s1, $s1, 1
+    beq  $s0, $zero, quant_solve_first_if
+    jal  board_done
+    beq  $v0, $zero, quant_solve_first_do_while
+
+quant_solve_first_if:
+    jal  board_done
+    bne  $v0, $zero, quant_solve_second_if
+    addi $s2, $s2, 1
+quant_solve_second_do_while:
+    jal  rule1
+    move $s0, $v0
+    jal  rule2
+    or   $s0, $s0, $v0
+    addi $s1, $s1, 1
+    beq  $s0, $zero, quant_solve_second_if
+    jal  board_done
+    beq  $v0, $zero, quant_solve_second_do_while
+
+quant_solve_second_if:
+    jal  board_done
+    li   $v0, 0
+    beq  $v0, $zero, quant_solve_exit
+    lw   $a1, 8($sp)
+    sw   $s1, 0($a1)
+    move $v0, $s2
+
+quant_solve_exit:
+    lw   $ra, 0($sp)
+    lw   $a0, 4($sp)
+    lw   $a1, 8($sp)
+    lw   $s0, 12($sp) # changed
+    lw   $s1, 16($sp) # iter
+    lw   $s2, 20($sp) # solution
+    lw   $s3, 24($sp)
+    add  $sp, $sp, 28
+
+    jr   $ra
+# QUANT_SOLVE
+
+# RULE 1
+
+rule1:
+    sub  $sp, $sp, 32
+    sw   $ra, 0($sp)
+    sw   $s0, 4($sp)     # board
+    sw   $s1, 8($sp)     # changed
+    sw   $s2, 12($sp)    # i
+    sw   $s3, 16($sp)    # j
+    sw   $s4, 20($sp)    # ii
+    sw   $s5, 24($sp)    # value
+    sw   $a0, 28($sp)    # saved a0
+
+    move $s0, $a0
+    li   $s1, 0          # $s1 is changed
+
+    li   $s2, 0
+r1_for_i:
+    bge  $s2, GRID_SQUARED, r1_done_for_i
+    li   $s3, 0
+
+r1_for_j:
+    bge  $s3, GRID_SQUARED, r1_done_for_j
+    mul  $t0, $s2, GRID_SQUARED   # i * 16
+    add  $t0, $t0, $s3   # i * 16 + j
+    mul  $t0, $t0, 2     # (i * 16 + j) * data_size
+    add  $t0, $t0, $s0   # &board[i][j]
+    lhu  $s5, 0($t0)     # board[i][j]
+    move $a0, $s5
+    jal  has_single_bit_set
+    beq  $v0, $0, r1_inc_j
+
+    li   $t1, 0          # k
+r1_for_k:
+    bge  $t1, GRID_SQUARED, r1_done_for_k
+    beq  $t1, $s3, r1_skip_inner_if1
+    mul  $t0, $s2, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $t1   # i * 16 + k
+    mul  $t0, $t0, 2     # (i * 16 + k) * data_size
+    add  $t0, $t0, $s0   # &board[i][k]
+    lhu  $t2, 0($t0)     # board[i][k]
+    and  $t3, $s5, $t2   # board[i][k] & value
+    beq  $t3, $0, r1_skip_inner_if1
+    not  $t4, $s5        # ~value
+    and  $t3, $t4, $t2   # 
+    sh   $t3, 0($t0)     # board[i][k] = 
+    li   $s1, 1
+r1_skip_inner_if1:
+
+    beq  $t1, $s2, r1_skip_inner_if2
+    mul  $t0, $t1, GRID_SQUARED    # k * 16
+    add  $t0, $t0, $s3   # k * 16 + j
+    mul  $t0, $t0, 2     # (k * 16 + j) * data_size
+    add  $t0, $t0, $s0   # &board[k][j]
+    lhu  $t2, 0($t0)     # board[k][j]
+    and  $t3, $s5, $t2   # board[k][j] & value
+    beq  $t3, $0, r1_skip_inner_if2
+    not  $t4, $s5        # ~value
+    and  $t3, $t4, $t2   # 
+    sh   $t3, 0($t0)     # board[i][k] = 
+    li   $s1, 1
+r1_skip_inner_if2:
     
-verticalcheck:
-    mul $t3, $t0, 4     # convert index to offset address for row
-    add $t4, $a0, $t3   # add offset to base address of board
-    lw  $t5, 0($t4)     # load address of board[row(i)] in $t5, $t5 is pointing to the beginning of the char*
-    add $t6, $t5, $a3   # add offset to base address of board[row(i)]
-    lb  $t7, 0($t6)     # load board[row(i)][col] in $t7
-    beq $t7,1,return1   # if board[i][col] == 1 return 1
-    add $t0,$t0,1       # increment i = i+1
-    j forloopvertical   # jump to for loop
+    add  $t1, $t1, 1
+    j    r1_for_k
+r1_done_for_k:
 
-forloophorizontal:
-    bge $t1,$t2,resetiandjleft  # if j >= n move on to next for loop
-    bne $t1,$a3,horizontalcheck  #checking j != col, if j != col move onto next check
-    add $t1,$t1,1  # incrementing j = j+1
-    j forloophorizontal # jump back to for
-    
-horizontalcheck:
-    mul $t3, $a2, 4     # convert index to offset address for row
-    add $t4, $a0, $t3   # add offset to base address of board
-    lw  $t5, 0($t4)     # load address of board[row] in $t5, $t5 is pointing to the beginning of the char*
-    add $t6, $t5, $t1   # add offset to base address of board[row]
-    lb  $t7, 0($t6)     # load board[row][col(j)] in $t7
-    beq $t7,1,return1   # if board[row][j] == 1 return 1
-    add $t1,$t1,1       # increment j = j+1
-    j forloophorizontal   # jump to for loop
+    nop
+    nop
+    nop
+    nop
 
-resetiandjleft:
-    li $t0,0    # i = 0
-    li $t1,0    # j = 0
-    j forleftdiagonal
+    move $a0, $s2
+    jal  get_square_begin
+    move $s4, $v0       # ii = get_square_begin(i)
 
-forleftdiagonal:
-    bge $t0,$t2,resetiandjright #for int i = 0; i <n; i++
-    beq $t0,$a2,incrementileft # (i != row)
-    
-    sub $t3,$t0,$a2
-    add $t1,$t3,$a3 #int j = (i-row) + col
-    
-    blt $t1,0,incrementileft # j>=0
-    bge $t1,$t2,incrementileft # j < n
-    
-    mul $t3, $t0, 4     # convert index to offset address for row
-    add $t4, $a0, $t3   # add offset to base address of board
-    lw  $t5, 0($t4)     # load address of board[row] in $t5, $t5 is pointing to the beginning of the char*
-    add $t6, $t5, $t1   # add offset to base address of board[row]
-    lb  $t7, 0($t6)     # load board[row][col(j)] in $t7
-    beq $t7,1,return1   # if board[row][j] == 1 return 1
-    
-    add $t0,$t0,1
-    j forleftdiagonal
+    move $a0, $s3
+    jal  get_square_begin
+                        # jj = get_square_begin(j)
+    move $t8, $s4       # k = ii
+    add  $t5, $s4, 4    # ii + GRIDSIZE
+r1_for_k2:
+    bge  $t8, $t5, r1_done_for_k2
+    move $t9, $v0       # l = jj
+    add  $t6, $v0, 4    # jj + GRIDSIZE
+r1_for_l:
+    bge  $t9, $t6, r1_done_for_l
 
-incrementileft:
-    add $t0,$t0,1
-    j forleftdiagonal
-    
+    bne  $t8, $s2, r1_skip_inner_if3
+    bne  $t9, $s3, r1_skip_inner_if3
+    j    r1_skip_inner_if4
 
-resetiandjright:
-    li $t0,0
-    li $t1,0
-    j forrightdiagonal
+r1_skip_inner_if3:
+    mul  $t0, $t8, GRID_SQUARED    # k * 16
+    add  $t0, $t0, $t9   # k * 16 + l
+    mul  $t0, $t0, 2     # (k * 16 + l) * data_size
+    add  $t0, $t0, $s0   # &board[k][l]
+    lhu  $t2, 0($t0)     # board[k][l]
+    and  $t3, $s5, $t2   # board[k][l] & value
+    beq  $t3, $0, r1_skip_inner_if4
+    not  $t4, $s5        # ~value
+    and  $t3, $t4, $t2   # 
+    sh   $t3, 0($t0)     # board[i][k] = 
+    li   $s1, 1
 
-forrightdiagonal:
-    bge $t0,$t2,return0 #for int i = 0; i <n; i++
-    beq $t0,$a2,incrementiright # (i != row)
-    
-    sub $t3,$a2,$t0
-    add $t1,$t3,$a3 #int j = (row-i) + col
-    
-    blt $t1,0,incrementiright # j>=0
-    bge $t1,$t2,incrementiright # j < n
-    
-    mul $t3, $t0, 4     # convert index to offset address for row
-    add $t4, $a0, $t3   # add offset to base address of board
-    lw  $t5, 0($t4)     # load address of board[row] in $t5, $t5 is pointing to the beginning of the char*
-    add $t6, $t5, $t1   # add offset to base address of board[row]
-    lb  $t7, 0($t6)     # load board[row][col(j)] in $t7
-    beq $t7,1,return1   # if board[row][j] == 1 return 1
-    
-    add $t0,$t0,1
-    j forrightdiagonal
+r1_skip_inner_if4:   
+    add  $t9, $t9, 1
+    j    r1_for_l
+r1_done_for_l:
+    add  $t8, $t8, 1
+    j    r1_for_k2
+r1_done_for_k2:
 
-incrementiright:
-    add $t0,$t0,1
-    j forrightdiagonal
-    
-return1:
-    li $v0,1            # output 1
-    jr $ra              # return
+    nop
+    nop
+    nop
+    nop
 
-return0:
-    li $v0,0            # output 0
-    jr $ra              # return
+r1_inc_j:
+    add  $s3, $s3, 1
+    j    r1_for_j
+r1_done_for_j:
+    add  $s2, $s2, 1
+    j    r1_for_i
+r1_done_for_i:
 
-.globl place_queen_step
-place_queen_step:
-    li      $v0, 1
-    beq     $a3, $0, pqs_return     # if (queens_left == 0)
+    move $v0, $s1          # return changed
+r1_return:
+    lw   $ra, 0($sp)
+    lw   $s0, 4($sp)
+    lw   $s1, 8($sp)
+    lw   $s2, 12($sp)
+    lw   $s3, 16($sp)
+    lw   $s4, 20($sp)
+    lw   $s5, 24($sp)
+    lw   $a0, 28($sp)    # saved a0
+    add  $sp, $sp, 32
+    jr   $ra
 
-pqs_prologue: 
-    sub     $sp, $sp, 36 
-    sw      $s0, 0($sp)
-    sw      $s1, 4($sp)
-    sw      $s2, 8($sp)
-    sw      $s3, 12($sp)
-    sw      $s4, 16($sp)
-    sw      $s5, 20($sp)
-    sw      $s6, 24($sp)
-    sw      $s7, 28($sp)
-    sw      $ra, 32($sp)
+# RULE 1
 
-    move    $s0, $a0                # $s0 = board
-    move    $s1, $a1                # $s1 = n
-    move    $s2, $a2                # $s2 = pos
-    move    $s3, $a3                # $s3 = queens_left
+# RULE 2
+rule2:
+    sub  $sp, $sp, 28
+    sw   $ra, 0($sp)
+    sw   $a0, 4($sp)
+    sw   $s0, 8($sp)  # changed
+    sw   $s1, 12($sp) # board
+    sw   $s2, 16($sp) # i
+    sw   $s3, 20($sp) # j
+    sw   $s4, 24($sp) # k
 
-    move    $s4, $a2                # $s4 = i = pos
+    li   $s0, 0       # bool changed = false;
+    move $s1, $a0
+    li   $s2, 0
+rule2_outer_for_loop:
+    li   $t0, GRID_SQUARED
+    bge  $s2, $t0, rule2_exit
+    addi $s2, $s2, 1
+    li   $s3, 0
+rule2_middle_for_loop:
+    li   $t0, GRID_SQUARED
+    bge  $s3, $t0, rule2_outer_for_loop
+    addi $s3, $s3, 1
+    mul  $t0, $s2, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s3   # i * GRID_SQUARED + j
+    mul  $t0, $t0, 2     # (i * GRID_SQUARED + j) * data_size
+    add  $t0, $t0, $s1   # &board[i][j]
+    lhu  $a0, 0($t0)     # board[i][j]
+    jal  has_single_bit_set
+    bne  $v0, $zero, rule2_middle_for_loop
 
-pqs_for:
-    mul     $t0, $s1, $s1           # $t0 = n * n
-    bge     $s4, $t0, pqs_for_end   # break out of loop if !(i < n * n)
+    li   $t1, 0    # jsum = 0
+    li   $t2, 0    # isum = 0
 
-    div     $s5, $s4, $s1           # $s5 = row = i / n
-    rem     $s6, $s4, $s1           # $s6 = col = i % n
+    li   $s4, 0
+rule2_inner_for_loop_k:
+    li   $t0, GRID_SQUARED
+    bge  $s4, $t0, rule2_inner_for_loop_k_finish
+    addi $s4, $s4, 1
+    beq  $s4, $s3, rule2_inner_for_loop_k_not_first_if
+    mul  $t0, $s2, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s4   # i * GRID_SQUARED + k
+    mul  $t0, $t0, 2     # (i * GRID_SQUARED + k) * data_size
+    add  $t0, $t0, $s1   # &board[i][k]
+    lhu  $t3, 0($t0)     # board[i][k]
+    or   $t1, $t1, $t3
+rule2_inner_for_loop_k_not_first_if:
+    beq  $s4, $s2, rule2_inner_for_loop_k_not_second_if
+    mul  $t0, $s4, GRID_SQUARED    # k * GRID_SQUARED
+    add  $t0, $t0, $s3   # k * GRID_SQUARED + j
+    mul  $t0, $t0, 2     # (k * GRID_SQUARED + j) * data_size
+    add  $t0, $t0, $s1   # &board[k][j]
+    lhu  $t3, 0($t0)     # board[k][j]
+    or   $t2, $t2, $t3
+rule2_inner_for_loop_k_not_second_if:
+    j rule2_inner_for_loop_k
+rule2_inner_for_loop_k_finish:
 
-    sll     $s7, $s5, 2             # $s7 = row * 4
-    add     $s7, $s7, $s0           # $s7 = &board[row] = board + row * 4
-    lw      $s7, 0($s7)             # $s7 = board[row]
+    li   $t4, ALL_VALUES
+    mul  $t0, $s2, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s3   # i * GRID_SQUARED + j
+    mul  $t0, $t0, 2     # (i * GRID_SQUARED + j) * data_size
+    add  $t0, $t0, $s1   # &board[i][j]
+    beq  $t4, $t1, rule2_all_values_first_not_if
+    nor  $t1, $t1, $t1   # ~jsum
+    and  $t3, $t4, $t1   # ALL_VALUES & ~jsum
+    sh   $t3, 0($t0)     # board[i][j] = ALL_VALUES & ~jsum
+    li   $s0, 1          # changed = true     
+    j    rule2_middle_for_loop
+rule2_all_values_first_not_if:
+    beq  $t4, $t2, rule2_all_values_second_not_if
+    nor  $t2, $t2, $t2   # ~isum
+    and  $t3, $t4, $t1   # ALL_VALUES & ~isum
+    sh   $t3, 0($t0)     # board[i][j] = ALL_VALUES & ~isum
+    li   $s0, 1          # changed = true     
+    j    rule2_middle_for_loop
+rule2_all_values_second_not_if:
 
-    add     $s7, $s7, $s6           # $s7 = &board[row][col] = board[row] + col
-    lb      $t1, 0($s7)             # $t1 = board[row][col]
+# ELIMINATE THE SQUARE
+    move $a0, $s2
+    jal  get_square_begin  # get_square_begin(i)
+    move $s4, $v0
+    move $a0, $s3
+    jal  get_square_begin  # get_square_begin(j)
+    move $t1, $s4          # ii = get_square_begin(i)
+    move $t2, $v0          # jj = get_square_begin(j)
 
-    bne     $t1, $0, pqs_for_inc    # skip if !(board[row][col] == 0)
+    li $t4, 0              # sum = 0
+    move $s4, $t1
+rule2_elimination_square_first_loop:
+    addi $t0, $t1, GRIDSIZE
+    bge  $s4, $t0, rule2_elimination_square_first_loop_done
+    addi $s4, $s4, 1
+    move $t5, $t2
+rule2_elimination_square_second_loop:
+    addi $t0, $t2, GRIDSIZE
+    bge  $t5, $t0, rule2_elimination_square_first_loop
+    addi $t5, $t5, 1
+    bne  $s4, $s2, rule2_elimination_square_pass_if
+    beq  $t5, $s3, rule2_elimination_square_second_loop
+    mul  $t0, $s4, GRID_SQUARED    # k * 16
+    add  $t0, $t0, $t5   # k * GRID_SQUARED + l
+    mul  $t0, $t0, 2     # (k * GRID_SQUARED + l) * data_size
+    add  $t0, $t0, $s1   # &board[k][l]
+    lhu  $t0, 0($t0)
+    or   $t4, $t4, $t0   # sum |= board[k][l]
+    j    rule2_elimination_square_second_loop
+rule2_elimination_square_first_loop_done:
+    li   $t5, ALL_VALUES
+    beq  $t5, $t4, rule2_middle_for_loop
+    mul  $t0, $s2, GRID_SQUARED    # i * 16
+    add  $t0, $t0, $s3   # i * GRID_SQUARED + j
+    mul  $t0, $t0, 2     # (i * GRID_SQUARED + j) * data_size
+    add  $t0, $t0, $s1   # &board[i][j]
+    nor  $t4, $t4, $t4
+    and  $t5, $t5, $t4
+    sh   $t5, 0($t0)
+    li   $s0, 1
+    j    rule2_middle_for_loop
+rule2_exit:
+    move $v0, $s0
+    lw   $ra, 0($sp)
+    lw   $a0, 4($sp)
+    lw   $s0, 8($sp)
+    lw   $s1, 12($sp) 
+    lw   $s2, 16($sp) 
+    lw   $s3, 20($sp)
+    lw   $s4, 24($sp)
+    add  $sp, $sp, 28
+    jr   $ra
+# RULE 2
 
-    move    $a0, $s0                # board
-    move    $a1, $s1                # n
-    move    $a2, $s5                # row
-    move    $a3, $s6                # col
-    jal     is_attacked             # call is_attacked(board, n, row, col)
 
-    bne     $v0, $0, pqs_for_inc    # skip if !(is_attacked(board, n, row, col) == 0)
+# GET_SQUARE_BEGIN
 
-    li      $t0, 1
-    sb      $t0, 0($s7)             # board[row][col] = 1
+get_square_begin:
+    div $v0, $a0, GRIDSIZE
+    mul $v0, $v0, GRIDSIZE
+    jr  $ra
 
-    move    $a0, $s0                # board
-    move    $a1, $s1                # n
-    add     $a2, $s2, 1             # pos + 1
-    sub     $a3, $s3, 1             # queens_left - 1
-    jal     place_queen_step        # call place_queen_step(board, n, pos + 1, queens_left - 1)
-
-    beq     $v0, $0, pqs_reset_square       # skip return if !(place_queen_step(board, n, pos + 1, queens_left - 1) == 0)
-
-    li      $v0, 1
-    j       pqs_epilogue            # return 1
-
-pqs_reset_square:
-    sb      $0, 0($s7)              # board[row][col] = 0
-
-pqs_for_inc:
-    add     $s4, $s4, 1             # ++i
-    j       pqs_for
-
-pqs_for_end:
-    move    $v0, $0                  # return 0
-
-pqs_epilogue:
-    lw      $s0, 0($sp)
-    lw      $s1, 4($sp)
-    lw      $s2, 8($sp)
-    lw      $s3, 12($sp)
-    lw      $s4, 16($sp)
-    lw      $s5, 20($sp)
-    lw      $s6, 24($sp)
-    lw      $s7, 28($sp)
-    lw      $ra, 32($sp)
-    add     $sp, $sp, 36 
-
-pqs_return:
-    jr      $ra
-
-.globl solve_queens
-solve_queens:
-sq_prologue:
-    sub     $sp, $sp, 20
-    sw      $s0, 0($sp)
-    sw      $s1, 4($sp)
-    sw      $s2, 8($sp)
-    sw      $s3, 12($sp)
-    sw      $ra, 16($sp)
-
-    move    $s0, $a0
-    move    $s1, $a1
-    move    $s2, $a2
-    move    $s3, $a3
-
-    li      $t0, 0      # $t0 is i
-
-sq_for_i:
-    beq     $t0, $s1, sq_end_for_i
-    li      $t1, 0      # $t1 is j
-
-sq_for_j:
-    beq     $t1, $s1, sq_end_for_j
-
-    sll     $t3, $t0, 2             # $t3 = i * 4
-    add     $t3, $t3, $s0           # $t3 = &board[i] = board + i * 4
-    lw      $t3, 0($t3)             # $t3 = board[i]
-
-    add     $t3, $t3, $t1           # $t3 = &board[i][j] = board[i] + j
-    sb      $0, 0($t3)              # board[i][j] = 0
-
-    add     $t1, $t1, 1     # ++j
-    j       sq_for_j
-
-sq_end_for_j:
-    add     $t0, $t0, 1     # ++i
-    j       sq_for_i
-
-sq_end_for_i:
-sq_ll_setup:
-    move    $t5, $a2        # $t5 is curr
-
-sq_ll_for:
-    beq     $t5, $0, sq_ll_end
-    
-    lw      $t6, 0($t5)         # $t6 = curr->pos
-    div     $t0, $t6, $s1       # $t0 = row = pos / n
-    rem     $t1, $t6, $s1       # $t1 = col = pos % n
-    
-    sll     $t3, $t0, 2             # $t3 = row * 4
-    add     $t3, $t3, $s0           # $t3 = &board[row] = board + row * 4
-    lw      $t3, 0($t3)             # $t3 = board[row]
-
-    add     $t3, $t3, $t1           # $t3 = &board[row][col] = board[row] + col
-    li      $t7, 1
-    sb      $t7, 0($t3)             # board[row][col] = 1
-
-    lw      $t5, 4($t5)             # curr = curr->next
-
-    j       sq_ll_for
-
-sq_ll_end:
-    move    $a2, $0
-    jal     place_queen_step        # call place_queen_step(sol_board, n, 0, queens_to_place)
-
-sq_epilogue:
-    lw      $s0, 0($sp)
-    lw      $s1, 4($sp)
-    lw      $s2, 8($sp)
-    lw      $s3, 12($sp)
-    lw      $ra, 16($sp)
-
-    add     $sp, $sp, 20
-    jr      $ra
+# GET_SQUARE_BEGIN
