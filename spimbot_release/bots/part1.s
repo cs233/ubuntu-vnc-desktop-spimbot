@@ -11,9 +11,6 @@ ANGLE_CONTROL           = 0xffff0018
 BOT_X                   = 0xffff0020
 BOT_Y                   = 0xffff0024
 
-OTHER_X                 = 0xffff00a0
-OTHER_Y                 = 0xffff00a4
-
 TIMER                   = 0xffff001c
 GET_MAP                 = 0xffff2008
 
@@ -29,28 +26,27 @@ TIMER_ACK               = 0xffff006c
 REQUEST_PUZZLE_INT_MASK = 0x800       ## Puzzle
 REQUEST_PUZZLE_ACK      = 0xffff00d8  ## Puzzle
 
-FALLING_INT_MASK        = 0x200
-FALLING_ACK             = 0xffff00f4
+RESPAWN_INT_MASK        = 0x2000      ## Respawn
+RESPAWN_ACK             = 0xffff00f0  ## Respawn
 
-STOP_FALLING_INT_MASK   = 0x400
-STOP_FALLING_ACK        = 0xffff00f8
+SHOOT                   = 0xffff2000
+CHARGE_SHOT             = 0xffff2004
 
-POWERWASH_ON            = 0xffff2000
-POWERWASH_OFF           = 0xffff2004
-
-GET_WATER_LEVEL         = 0xffff201c
+GET_OP_BULLETS          = 0xffff200c
+GET_MY_BULLETS          = 0xffff2010
+GET_AVAILABLE_BULLETS   = 0xffff2014
 
 MMIO_STATUS             = 0xffff204c
 
 .data
 ### Puzzle
-puzzlewrapper:     .byte 0:400
+board:     .space 512
 #### Puzzle
 
-has_puzzle: .word 0
-
+# If you want, you can use the following to detect if a bonk has happened.
 has_bonked: .byte 0
-# -- string literals --
+
+
 .text
 main:
     sub $sp, $sp, 4
@@ -125,11 +121,8 @@ interrupt_dispatch:                 # Interrupt:
     and     $a0, $k0, REQUEST_PUZZLE_INT_MASK
     bne     $a0, 0, request_puzzle_interrupt
 
-    and     $a0, $k0, FALLING_INT_MASK
-    bne     $a0, 0, falling_interrupt
-
-    and     $a0, $k0, STOP_FALLING_INT_MASK
-    bne     $a0, 0, stop_falling_interrupt
+    and     $a0, $k0, RESPAWN_INT_MASK
+    bne     $a0, 0, respawn_interrupt
 
     li      $v0, PRINT_STRING       # Unhandled interrupt types
     la      $a0, unhandled_str
@@ -146,7 +139,7 @@ bonk_interrupt:
 
 timer_interrupt:
     sw      $0, TIMER_ACK
-    #Fill your timer interrupt code here
+    #Fill in your timer interrupt code here
     j        interrupt_dispatch     # see if other interrupts are waiting
 
 request_puzzle_interrupt:
@@ -154,13 +147,8 @@ request_puzzle_interrupt:
     #Fill in your puzzle interrupt code here
     j       interrupt_dispatch
 
-falling_interrupt:
-    sw      $0, FALLING_ACK
-    #Fill in your respawn handler code here
-    j       interrupt_dispatch
-
-stop_falling_interrupt:
-    sw      $0, STOP_FALLING_ACK
+respawn_interrupt:
+    sw      $0, RESPAWN_ACK
     #Fill in your respawn handler code here
     j       interrupt_dispatch
 
