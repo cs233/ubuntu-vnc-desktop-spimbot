@@ -1,78 +1,50 @@
-# syscall constants
+### syscall constants
 PRINT_STRING            = 4
 PRINT_CHAR              = 11
 PRINT_INT               = 1
 
-# memory-mapped I/O
-VELOCITY                = 0xffff0010
+### MMIO addrs
 ANGLE                   = 0xffff0014
 ANGLE_CONTROL           = 0xffff0018
-
-BOT_X                   = 0xffff0020
-BOT_Y                   = 0xffff0024
+VELOCITY                = 0xffff0010
+LOCK_SLAB               = 0xffff2000;
+UNLOCK_SLAB             = 0xffff2004;
 
 TIMER                   = 0xffff001c
-GET_MAP                 = 0xffff2008
 
-REQUEST_PUZZLE          = 0xffff00d0  ## Puzzle
-SUBMIT_SOLUTION         = 0xffff00d4  ## Puzzle
-
-BONK_INT_MASK           = 0x1000
-BONK_ACK                = 0xffff0060
-
-TIMER_INT_MASK          = 0x8000
-TIMER_ACK               = 0xffff006c
-
-REQUEST_PUZZLE_INT_MASK = 0x800       ## Puzzle
-REQUEST_PUZZLE_ACK      = 0xffff00d8  ## Puzzle
-
-RESPAWN_INT_MASK        = 0x2000      ## Respawn
-RESPAWN_ACK             = 0xffff00f0  ## Respawn
-
-SHOOT                   = 0xffff2000
-CHARGE_SHOT             = 0xffff2004
-
-GET_OP_BULLETS          = 0xffff200c
-GET_MY_BULLETS          = 0xffff2010
-GET_AVAILABLE_BULLETS   = 0xffff2014
-
-MMIO_STATUS             = 0xffff204c
+BONK_INT_MASK           = 0x1000      ## Bonk
+BONK_ACK                = 0xffff0060  ## Bonk
+TIMER_INT_MASK          = 0x8000      ## Timer
+TIMER_ACK               = 0xffff006c  ## Timer
 
 .data
-### Puzzle
-board:     .space 512
-#### Puzzle
 
 # If you want, you can use the following to detect if a bonk has happened.
 has_bonked: .byte 0
 
-
 .text
 main:
-    sub $sp, $sp, 4
-    sw  $ra, 0($sp)
+        # enable interrupts
+        li      $t4     1
+        or      $t4     $t4     TIMER_INT_MASK
+        or      $t4,    $t4,    BONK_INT_MASK             # enable bonk interrupt
+        or      $t4,    $t4,    1 # global enable
+        mtc0    $t4     $12
 
-    # Construct interrupt mask
-    li      $t4, 0
-    or      $t4, $t4, TIMER_INT_MASK            # enable timer interrupt
-    or      $t4, $t4, BONK_INT_MASK             # enable bonk interrupt
-    or      $t4, $t4, REQUEST_PUZZLE_INT_MASK   # enable puzzle interrupt
-    or      $t4, $t4, 1 # global enable
-    mtc0    $t4, $12
-    
-    li $t1, 0
-    sw $t1, ANGLE
-    li $t1, 1
-    sw $t1, ANGLE_CONTROL
-    li $t2, 0
-    sw $t2, VELOCITY
-        
-    # YOUR CODE GOES HERE!!!!!!
-    
-loop: # Once done, enter an infinite loop so that your bot can be graded by QtSpimbot once 10,000,000 cycles have elapsed
-    j loop
-    
+        li $t1, 0
+        sw $t1, ANGLE
+        li $t1, 1
+        sw $t1, ANGLE_CONTROL
+        li $t2, 0
+        sw $t2, VELOCITY
 
+        # YOUR CODE GOES HERE!!!!!!
+
+
+rest:
+        j       rest
+
+# ======================== kernel code ================================
 .kdata
 chunkIH:    .space 40
 non_intrpt_str:    .asciiz "Non-interrupt exception\n"
@@ -107,7 +79,6 @@ interrupt_handler:
     bne     $a0, 0, non_intrpt
 
 
-
 interrupt_dispatch:                 # Interrupt:
     mfc0    $k0, $13                # Get Cause register, again
     beq     $k0, 0, done            # handled all outstanding interrupts
@@ -118,12 +89,6 @@ interrupt_dispatch:                 # Interrupt:
     and     $a0, $k0, TIMER_INT_MASK    # is there a timer interrupt?
     bne     $a0, 0, timer_interrupt
 
-    and     $a0, $k0, REQUEST_PUZZLE_INT_MASK
-    bne     $a0, 0, request_puzzle_interrupt
-
-    and     $a0, $k0, RESPAWN_INT_MASK
-    bne     $a0, 0, respawn_interrupt
-
     li      $v0, PRINT_STRING       # Unhandled interrupt types
     la      $a0, unhandled_str
     syscall
@@ -131,26 +96,13 @@ interrupt_dispatch:                 # Interrupt:
 
 bonk_interrupt:
     sw      $0, BONK_ACK
-    la      $t0, has_bonked
-    li      $t1, 1
-    sb      $t1, 0($t0)
     #Fill in your bonk handler code here
     j       interrupt_dispatch      # see if other interrupts are waiting
 
 timer_interrupt:
     sw      $0, TIMER_ACK
     #Fill in your timer interrupt code here
-    j        interrupt_dispatch     # see if other interrupts are waiting
-
-request_puzzle_interrupt:
-    sw      $0, REQUEST_PUZZLE_ACK
-    #Fill in your puzzle interrupt code here
-    j       interrupt_dispatch
-
-respawn_interrupt:
-    sw      $0, RESPAWN_ACK
-    #Fill in your respawn handler code here
-    j       interrupt_dispatch
+    j       interrupt_dispatch      # see if other interrupts are waiting
 
 non_intrpt:                         # was some non-interrupt
     li      $v0, PRINT_STRING
