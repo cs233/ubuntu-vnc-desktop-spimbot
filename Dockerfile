@@ -7,7 +7,7 @@
 # Authors:
 # Xiangmin Jiao <xmjiao@gmail.com>
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 LABEL forked by Phil Vukovic <philvukovic@gmail.com>, original maintainer Xiangmin Jiao <xmjiao@gmail.com>
 
 ARG DOCKER_LANG=en_US
