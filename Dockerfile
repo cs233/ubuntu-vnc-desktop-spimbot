@@ -173,7 +173,7 @@ RUN mkdir -p $DOCKER_HOME/.config/mozilla && \
 # QtSpimbot specific setup 
 ########################################################
 RUN apt-get update && \
-    apt-get install -y qt5-default wget xdg-user-dirs
+    apt-get install -y qtbase5-dev qtchooser qt5-qmake qtbase5-dev-tools wget xdg-user-dirs
 
 # change the Desktop to be the folder ~/shared instead of ~/Desktop
 RUN sed -i 's/\/home\/ubuntu\/Desktop/\/home\/ubuntu\/shared/g' $DOCKER_HOME/.config/pcmanfm/LXDE/desktop-items-0.conf
