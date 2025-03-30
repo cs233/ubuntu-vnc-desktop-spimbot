@@ -10,7 +10,11 @@ VELOCITY                = 0xffff0010
 LOCK_SLAB               = 0xffff2000;
 UNLOCK_SLAB             = 0xffff2004;
 
+BOT_X                   = 0xffff0020
+BOT_Y                   = 0xffff0024
+
 TIMER                   = 0xffff001c
+GET_MAP                 = 0xffff2008
 
 BONK_INT_MASK           = 0x1000      ## Bonk
 BONK_ACK                = 0xffff0060  ## Bonk
@@ -18,6 +22,8 @@ TIMER_INT_MASK          = 0x8000      ## Timer
 TIMER_ACK               = 0xffff006c  ## Timer
 REQUEST_PUZZLE_INT_MASK = 0x800       ## Puzzle
 REQUEST_PUZZLE_ACK      = 0xffff00d8  ## Puzzle
+
+MMIO_STATUS             = 0xffff204c
 
 .data
 
