@@ -9,6 +9,7 @@ ANGLE_CONTROL           = 0xffff0018
 VELOCITY                = 0xffff0010
 LOCK_SLAB               = 0xffff2000;
 UNLOCK_SLAB             = 0xffff2004;
+GET_SLABS               = 0xffff200c;
 
 BOT_X                   = 0xffff0020
 BOT_Y                   = 0xffff0024
